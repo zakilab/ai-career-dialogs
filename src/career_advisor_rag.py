@@ -323,7 +323,7 @@ def format_dict_stats_for_prompt(stats_dict: dict) -> str:
 # 4. 動作検証用メイン処理 (Execution)
 # ==========================================
 if __name__ == "__main__":
-    SPREADSHEET_KEY = "1Zb5bONn97V1Pbo_kaTP-PPHdGiXPHNVJdYNyK7XRXP4"
+    SPREADSHEET_KEY = "" # TODO secretからキー取得
 
     print("=== 0. 制限付きスプレッドシートから認証付きでデータを取得中 ===")
     df_jobs = load_spreadsheet_data_authenticated(SPREADSHEET_KEY)

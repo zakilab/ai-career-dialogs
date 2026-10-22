@@ -350,7 +350,7 @@ def scrape_and_save():
     try:
         SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
         SERVICE_ACCOUNT_FILE = "ai-career-diagnosis-dev-44beb324ab3d.json"
-        SPREADSHEET_ID = "1Zb5bONn97V1Pbo_kaTP-PPHdGiXPHNVJdYNyK7XRXP4"
+        SPREADSHEET_ID = ""
 
         creds = Credentials.from_service_account_file(
             SERVICE_ACCOUNT_FILE, scopes=SCOPE
