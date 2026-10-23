@@ -288,7 +288,7 @@ def generate_career_plan(user_profile: dict, rag_context: dict, api_key: str = N
     with genai.Client(
         api_key=api_key,
         http_options=types.HttpOptions(
-            timeout=60000,
+            timeout=120000,
             retry_options=types.HttpRetryOptions(attempts=1),
         ),
     ) as client:
@@ -341,18 +341,6 @@ if __name__ == "__main__":
         "weekly_learning_hours": 5,
         "interested_techs": ["AWS", "AI", "Python"],
     }
-    # user_profile = {
-    #     "age": 34,
-    #     "current_monthly_price_man": 55,
-    #     "qualifications": ["基本情報技術者", "AWS SAA"],
-    #     "current_role": "SES・インフラ/システムエンジニア",
-    #     "experienced_techs": ["Python", "Linux", "SQL", "Bash"],
-    #     "strong_domain": "障害対応・基本設計・顧客との仕様調整",
-    #     "target_min_monthly_price_man": 65,
-    #     "target_ideal_monthly_price_man": 80,
-    #     "weekly_learning_hours": 5,
-    #     "interested_techs": ["AWS", "Docker", "Terraform"],
-    # }
 
     if not df_jobs.empty:
         print("=== 1. 統計集計を実行中 ===")
