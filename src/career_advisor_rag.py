@@ -295,8 +295,9 @@ def generate_career_plan(user_profile: dict, rag_context: dict, api_key: str = N
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model="gemini-3.8-flash", contents=prompt
-                )
+                    model="gemini-3.8-flash",
+                    contents="Reply with OK only.",
+                )   
                 break
             except errors.ServerError as error:
                 if error.code not in (500, 502, 503, 504) or attempt == 2:
