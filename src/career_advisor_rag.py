@@ -296,7 +296,7 @@ def generate_career_plan(user_profile: dict, rag_context: dict, api_key: str = N
             try:
                 response = client.models.generate_content(
                     model="gemini-3.8-flash",
-                    contents="Reply with OK only.",
+                    contents=prompt,
                 )   
                 break
             except errors.ServerError as error:
