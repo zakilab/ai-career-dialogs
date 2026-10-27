@@ -106,7 +106,8 @@ def main():
                     #st.error("Geminiが混雑しているか、一時的に応答できません。最大3回試しましたが診断できませんでした。少し時間をおいて再試行してください。")
                     st.error(
                         f"Gemini APIで一時的なエラーが発生しました"
-                        f"（HTTP {error.code}）。最大3回試行しました。"
+                        # f"（HTTP {error.code}）。最大3回試行しました。"
+                        f"（HTTP {error.code}）。1回実行しました。再試行は行っていません。"
                     )   
                 elif error.code == 429:
                     st.error("Gemini APIの利用上限に達しました。管理者は割り当て・請求設定を確認してください。")

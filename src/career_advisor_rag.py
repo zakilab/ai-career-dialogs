@@ -292,7 +292,7 @@ def generate_career_plan(user_profile: dict, rag_context: dict, api_key: str = N
             retry_options=types.HttpRetryOptions(attempts=1),
         ),
     ) as client:
-        for attempt in range(3):
+        for attempt in range(1):
             try:
                 response = client.models.generate_content(
                     model="gemini-3.8-flash",
@@ -300,7 +300,7 @@ def generate_career_plan(user_profile: dict, rag_context: dict, api_key: str = N
                 )   
                 break
             except errors.ServerError as error:
-                if error.code not in (500, 502, 503, 504) or attempt == 2:
+                if error.code not in (500, 502, 503, 504) or attempt == 0:
                     raise
                 time.sleep(2 ** (attempt + 1))
     if not response.text:
