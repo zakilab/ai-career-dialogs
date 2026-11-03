@@ -1,3 +1,5 @@
+import json
+import os
 import random
 import re
 import time
@@ -349,12 +351,29 @@ def scrape_and_save():
 
     try:
         SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
-        SERVICE_ACCOUNT_FILE = "ai-career-diagnosis-dev-44beb324ab3d.json"
-        SPREADSHEET_ID = ""
+        SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "").strip()
+        service_account_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-        creds = Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, scopes=SCOPE
-        )
+        if not SPREADSHEET_ID:
+            raise ValueError("環境変数 SPREADSHEET_ID が設定されていません。")
+
+        if service_account_json:
+            # GitHub Actionsでは、Secretsから渡された認証JSONを使う
+            service_account_info = json.loads(service_account_json)
+            creds = Credentials.from_service_account_info(
+                service_account_info,
+                scopes=SCOPE,
+            )
+        else:
+            # ローカルでは、既存の認証JSONファイルを使う
+            credentials_path = os.environ.get(
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                "ai-career-diagnosis-dev-44beb324ab3d.json",
+            )
+            creds = Credentials.from_service_account_file(
+                credentials_path,
+                scopes=SCOPE,
+            )
         client = gspread.authorize(creds)
 
         sheet = client.open_by_key(SPREADSHEET_ID).worksheet("job_db")
@@ -373,6 +392,7 @@ def scrape_and_save():
 
     except Exception as e:
         print(f"スプレッドシート書き込み時にエラーが発生しました: {e}")
+        raise
 
 
 if __name__ == "__main__":
