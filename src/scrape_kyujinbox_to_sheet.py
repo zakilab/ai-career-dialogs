@@ -8,6 +8,9 @@ from google.oauth2.service_account import Credentials
 import gspread
 from bs4 import BeautifulSoup
 import requests
+from urllib.parse import urljoin
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # --- 対象とする5言語とURLエンコード済みパス ---
 TARGET_LANGUAGES = {
@@ -238,10 +241,128 @@ def fetch_html_with_retry(session, url, max_retries=3):
 
     return None
 
+def extract_job_url(card, page_url):
+    """求人タイトルに関連するリンクから求人URLを取り出す。"""
+    title_tag = card.select_one("h2, h3, [class*='title']")
+
+    if title_tag is None:
+        return None
+
+    # タイトルの内側にリンクがある場合
+    link_tag = title_tag.find("a", href=True)
+
+    # タイトル全体がリンクで囲まれている場合
+    if link_tag is None:
+        link_tag = title_tag.find_parent("a", href=True)
+
+    if link_tag is None:
+        return None
+
+    href = link_tag.get("href", "").strip()
+
+    if not href or href.startswith(("#", "javascript:", "mailto:")):
+        return None
+
+    job_url = urljoin(page_url, href)
+
+    if not job_url.startswith(("https://", "http://")):
+        return None
+
+    return job_url
+
+def save_jobs_by_url(sheet, header_row, jobs_data):
+    """同じ求人URLは更新し、新しいURLは追加する。"""
+    if not jobs_data:
+        raise ValueError("取得求人が0件のため、保存を中止します。")
+
+    width = len(header_row)
+    url_index = header_row.index("求人URL")
+    language_index = header_row.index("検索言語")
+
+    existing_values = sheet.get_all_values()
+    jobs_by_url = {}
+
+    # 既存データをURLで検索できる形にする
+    if existing_values:
+        if existing_values[0] != header_row:
+            raise ValueError("保存先シートの見出しが想定と異なります。")
+
+        for row in existing_values[1:]:
+            if not any(str(cell).strip() for cell in row):
+                continue
+
+            if len(row) > width:
+                raise ValueError("保存先に想定外の列があります。")
+
+            row = row + [""] * (width - len(row))
+            job_url = row[url_index].strip()
+
+            if not job_url:
+                raise ValueError("保存先に求人URLがない行があります。")
+            if job_url in jobs_by_url:
+                raise ValueError("保存先に同じ求人URLが複数あります。")
+
+            row[url_index] = job_url
+            jobs_by_url[job_url] = row
+
+    # 今回の取得分も、同じURLを1件にまとめる
+    collected_by_url = {}
+
+    for source_row in jobs_data:
+        if len(source_row) != width:
+            raise ValueError("取得データの列数が見出しと一致しません。")
+
+        row = list(source_row)
+        job_url = str(row[url_index]).strip()
+
+        if not job_url:
+            raise ValueError("取得データに求人URLがありません。")
+
+        row[url_index] = job_url
+
+        if job_url in collected_by_url:
+            previous = collected_by_url[job_url]
+            languages = (
+                str(previous[language_index]).split(",")
+                + str(row[language_index]).split(",")
+            )
+            row[language_index] = ", ".join(
+                dict.fromkeys(
+                    value.strip() for value in languages if value.strip()
+                )
+            )
+
+        collected_by_url[job_url] = row
+
+    added = sum(url not in jobs_by_url for url in collected_by_url)
+    updated = len(collected_by_url) - added
+
+    # 既存URLは置き換え、新しいURLは追加する
+    jobs_by_url.update(collected_by_url)
+    values = [header_row] + list(jobs_by_url.values())
+
+    # 必要な行数・列数を確保する
+    if sheet.row_count < len(values) or sheet.col_count < width:
+        sheet.resize(
+            rows=max(sheet.row_count, len(values)),
+            cols=max(sheet.col_count, width),
+        )
+
+    sheet.update(
+        range_name=f"A1:L{len(values)}",
+        values=values,
+        value_input_option="RAW",
+    )
+
+    print(
+        f"保存完了：新規 {added} 件、更新対象 {updated} 件、"
+        f"保存総数 {len(jobs_by_url)} 件"
+    )
 
 def scrape_and_save():
     session = requests.Session()
     jobs_data = []
+    fetched_at = datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
     total_langs = len(TARGET_LANGUAGES)
 
@@ -268,6 +389,13 @@ def scrape_and_save():
             job_cards = soup.select("section[class*='result']")
 
             for card in job_cards:
+                job_url = extract_job_url(card, url)
+
+                if job_url is None:
+                    raise ValueError(
+                        f"求人URLを取得できませんでした。保存を中止します: {url}"
+                    )
+
                 title_tag = card.select_one("h2, h3, [class*='title']")
                 company_tag = card.select_one("[class*='area']")
                 salary_tag = card.select_one(
@@ -313,6 +441,8 @@ def scrape_and_save():
                         salary_type,
                         min_salary,
                         max_salary,
+                        job_url,
+                        fetched_at,
                     ]
                 )
 
@@ -347,6 +477,8 @@ def scrape_and_save():
         "給与種別",
         "下限給与(円)",
         "上限給与(円)",
+        "求人URL",
+        "最終取得日時", 
     ]
 
     try:
@@ -376,19 +508,8 @@ def scrape_and_save():
             )
         client = gspread.authorize(creds)
 
-        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("job_db")
-
-        all_values = sheet.get_all_values()
-        has_data = any(any(cell.strip() for cell in row) for row in all_values)
-
-        if not has_data:
-            sheet.append_row(header_row)
-
-        if jobs_data:
-            sheet.append_rows(jobs_data)
-            print("Googleスプレッドシートへの書き込みが完了しました！")
-        else:
-            print("追加するデータがありませんでした。")
+        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("job_db_v2")
+        save_jobs_by_url(sheet, header_row, jobs_data)
 
     except Exception as e:
         print(f"スプレッドシート書き込み時にエラーが発生しました: {e}")
