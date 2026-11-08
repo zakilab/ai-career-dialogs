@@ -248,8 +248,12 @@ def extract_job_url(card, page_url):
     if title_tag is None:
         return None
 
-    # タイトルの内側にリンクがある場合
-    link_tag = title_tag.find("a", href=True)
+    # タイトル自体がリンクの場合
+    if title_tag.name == "a" and title_tag.get("href"):
+        link_tag = title_tag
+    else:
+        # タイトルの内側にリンクがある場合
+        link_tag = title_tag.find("a", href=True)       
 
     # タイトル全体がリンクで囲まれている場合
     if link_tag is None:
@@ -392,6 +396,8 @@ def scrape_and_save():
                 job_url = extract_job_url(card, url)
 
                 if job_url is None:
+                    print("URL抽出失敗：対象HTMLの先頭部分")
+                    print(str(card)[:3000])
                     raise ValueError(
                         f"求人URLを取得できませんでした。保存を中止します: {url}"
                     )
