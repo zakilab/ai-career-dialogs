@@ -393,6 +393,10 @@ def scrape_and_save():
             job_cards = soup.select("section[class*='result']")
 
             for card in job_cards:
+                # 求人ではない会員登録バナーを除外する
+                if card.get("id") == "offermailBanner":
+                    continue
+
                 job_url = extract_job_url(card, url)
 
                 if job_url is None:
